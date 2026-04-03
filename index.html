@@ -1,0 +1,291 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Camera, Plus, X, Coffee, CreditCard, Tag, Calendar, MapPin, ChevronRight, Check } from 'lucide-react';
+
+// Mock Constants
+const COFFEE_TYPES = [
+  { id: 'latte', name: '拿铁', icon: '☕' },
+  { id: 'americano', name: '美式', icon: '🥤' },
+  { id: 'dirty', name: 'Dirty', icon: '🥛' },
+  { id: 'handbrew', name: '手冲', icon: '⚗️' },
+  { id: 'flatwhite', name: '澳白', icon: '🎨' },
+];
+
+const DEFAULT_IMAGES = [
+  'https://images.unsplash.com/photo-1541167760496-1628856ab772?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=400&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=400&auto=format&fit=crop'
+];
+
+export default function App() {
+  const [logs, setLogs] = useState([
+    { id: 1, type: '拿铁', brand: 'Manner Coffee', price: 25, date: '2023-10-01', img: DEFAULT_IMAGES[0], note: '口感丝滑，燕麦奶很香' },
+    { id: 2, type: '美式', brand: 'Starbucks', price: 30, date: '2023-10-02', img: DEFAULT_IMAGES[1], note: '早起提神必备' },
+  ]);
+
+  const [selectedCoffee, setSelectedCoffee] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
+  // Form State
+  const [formData, setFormData] = useState({
+    brand: '',
+    type: '拿铁',
+    price: '',
+    note: '',
+    img: DEFAULT_IMAGES[2]
+  });
+
+  // Calculate Heatmap Data
+  const currentMonthDays = 31;
+  const loggedDays = useMemo(() => {
+    return logs.map(log => parseInt(log.date.split('-')[2]));
+  }, [logs]);
+
+  const handleAddLog = (e) => {
+    e.preventDefault();
+    const newLog = {
+      ...formData,
+      id: Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      price: parseFloat(formData.price) || 0
+    };
+    setLogs([newLog, ...logs]);
+    setIsAddModalOpen(false);
+    setFormData({ brand: '', type: '拿铁', price: '', note: '', img: DEFAULT_IMAGES[Math.floor(Math.random() * DEFAULT_IMAGES.length)] });
+  };
+
+  const openQuickAdd = (type) => {
+    setFormData(prev => ({ ...prev, type }));
+    setIsAddModalOpen(true);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FAF9F6] text-[#4A4238] font-sans selection:bg-[#DCCFBF]">
+      
+      {/* --- Header --- */}
+      <header className="max-w-md mx-auto pt-12 pb-6 px-6">
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="text-4xl font-serif font-light tracking-tight">Coffee Daily.</h1>
+            <p className="text-sm text-gray-400 mt-2 font-light">用咖啡因标记生活的刻度</p>
+          </div>
+          <div className="bg-[#DCCFBF] text-white px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase mb-1">
+            Oct 2023
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-md mx-auto px-6 space-y-8 pb-32">
+        
+        {/* --- Quick Action Icons --- */}
+        <section>
+          <div className="flex justify-between items-center bg-white/80 backdrop-blur-md p-5 rounded-[2.5rem] shadow-sm border border-white/50">
+            {COFFEE_TYPES.map((item) => (
+              <button 
+                key={item.id}
+                onClick={() => openQuickAdd(item.name)}
+                className="flex flex-col items-center group transition-all active:scale-90"
+              >
+                <div className="w-12 h-12 bg-[#F3EFEA] rounded-full flex items-center justify-center text-2xl group-hover:bg-[#EAE3DB] group-hover:rotate-12 transition-all">
+                  {item.icon}
+                </div>
+                <span className="text-[10px] mt-2 font-medium opacity-60 group-hover:opacity-100">{item.name}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* --- Calendar Heatmap --- */}
+        <section className="bg-white p-6 rounded-[2rem] border border-[#F0EBE3] shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">Monthly Activity</h2>
+            <span className="text-[10px] font-medium text-[#A89078]">{loggedDays.length} 杯已解锁</span>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: currentMonthDays }).map((_, i) => {
+              const day = i + 1;
+              const hasLogged = loggedDays.includes(day);
+              return (
+                <div 
+                  key={i} 
+                  className={`aspect-square rounded-lg flex items-center justify-center text-[10px] transition-all duration-500 ${
+                    hasLogged 
+                      ? 'bg-[#A89078] text-white shadow-inner scale-105' 
+                      : 'bg-[#F9F7F4] text-[#D1C7BD]'
+                  }`}
+                >
+                  {hasLogged ? <Check size={10} strokeWidth={4} /> : day}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* --- History Feed --- */}
+        <section className="space-y-4">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 px-2">Recent Brews</h2>
+          {logs.map((log) => (
+            <div 
+              key={log.id}
+              onClick={() => setSelectedCoffee(log)}
+              className="group flex items-center bg-white p-3 pr-5 rounded-3xl border border-[#F0EBE3] hover:border-[#DCCFBF] hover:shadow-lg hover:shadow-[#4A4238]/5 transition-all cursor-pointer active:scale-[0.98]"
+            >
+              <div className="relative overflow-hidden rounded-2xl w-16 h-16 shrink-0">
+                <img src={log.img} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="coffee" />
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="font-semibold text-sm text-[#4A4238]">{log.brand}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                   <span className="text-[10px] bg-[#F3EFEA] text-[#A89078] px-2 py-0.5 rounded-md">{log.type}</span>
+                   <span className="text-[10px] text-gray-300">|</span>
+                   <span className="text-[10px] text-gray-400">{log.date.split('-')[2]} Oct</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-medium text-[#A89078]">¥{log.price}</div>
+                <ChevronRight size={14} className="text-gray-200 ml-auto mt-1" />
+              </div>
+            </div>
+          ))}
+        </section>
+      </main>
+
+      {/* --- Detail Modal --- */}
+      {selectedCoffee && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4">
+          <div 
+            className="bg-[#FAF9F6] w-full max-w-sm rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-500"
+          >
+            <div className="relative h-80">
+              <img src={selectedCoffee.img} className="w-full h-full object-cover" alt="detail" />
+              <button 
+                onClick={() => setSelectedCoffee(null)}
+                className="absolute top-6 right-6 w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/40 transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#FAF9F6] to-transparent"></div>
+            </div>
+            
+            <div className="px-8 pb-10 -mt-6 relative z-10">
+              <div className="flex justify-center mb-6">
+                <span className="inline-block px-4 py-1.5 bg-white border border-[#F0EBE3] rounded-full text-[10px] font-bold text-[#A89078] uppercase tracking-widest shadow-sm">
+                  {selectedCoffee.type}
+                </span>
+              </div>
+              
+              <h2 className="text-3xl font-serif text-center mb-2">{selectedCoffee.brand}</h2>
+              <p className="text-center text-sm text-gray-400 font-light mb-8 italic">"{selectedCoffee.note}"</p>
+              
+              <div className="grid grid-cols-2 gap-px bg-[#F0EBE3] rounded-3xl overflow-hidden border border-[#F0EBE3]">
+                <div className="bg-white p-6 flex flex-col items-center">
+                  <div className="w-8 h-8 bg-[#FDFCFB] rounded-full flex items-center justify-center mb-2">
+                    <CreditCard size={16} className="text-[#DCCFBF]" />
+                  </div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Cost</p>
+                  <p className="text-lg font-medium">¥{selectedCoffee.price}</p>
+                </div>
+                <div className="bg-white p-6 flex flex-col items-center">
+                  <div className="w-8 h-8 bg-[#FDFCFB] rounded-full flex items-center justify-center mb-2">
+                    <Calendar size={16} className="text-[#DCCFBF]" />
+                  </div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Date</p>
+                  <p className="text-lg font-medium">{selectedCoffee.date}</p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setSelectedCoffee(null)}
+                className="w-full mt-8 py-4 bg-[#4A4238] text-white rounded-2xl font-medium shadow-lg shadow-[#4A4238]/20 active:scale-[0.98] transition-all"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Add New Log Modal (Slide Drawer) --- */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-end justify-center z-[110]">
+          <div className="bg-white w-full max-w-md rounded-t-[3rem] p-8 animate-in slide-in-from-bottom duration-500">
+            <div className="w-12 h-1.5 bg-gray-100 rounded-full mx-auto mb-8"></div>
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-serif">记录今日醇香</h2>
+              <button onClick={() => setIsAddModalOpen(false)} className="p-2 text-gray-400"><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleAddLog} className="space-y-6">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">品牌 / 店名</label>
+                <input 
+                  autoFocus
+                  required
+                  type="text" 
+                  value={formData.brand}
+                  onChange={e => setFormData({...formData, brand: e.target.value})}
+                  placeholder="例如: Manner, Blue Bottle..."
+                  className="w-full bg-[#F9F7F4] border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-[#DCCFBF] outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">类型</label>
+                  <select 
+                    value={formData.type}
+                    onChange={e => setFormData({...formData, type: e.target.value})}
+                    className="w-full bg-[#F9F7F4] border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-[#DCCFBF] outline-none appearance-none"
+                  >
+                    {COFFEE_TYPES.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">金额 (¥)</label>
+                  <input 
+                    required
+                    type="number" 
+                    value={formData.price}
+                    onChange={e => setFormData({...formData, price: e.target.value})}
+                    placeholder="0.00"
+                    className="w-full bg-[#F9F7F4] border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-[#DCCFBF] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 block">笔记 / 心情</label>
+                <textarea 
+                  rows="2"
+                  value={formData.note}
+                  onChange={e => setFormData({...formData, note: e.target.value})}
+                  placeholder="风味描述或心情..."
+                  className="w-full bg-[#F9F7F4] border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-[#DCCFBF] outline-none resize-none"
+                ></textarea>
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full py-5 bg-[#4A4238] text-white rounded-[2rem] font-bold text-sm tracking-widest uppercase shadow-xl shadow-[#4A4238]/20 transition-all active:scale-95"
+              >
+                保存记录
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- Global Add Button --- */}
+      <button 
+        onClick={() => setIsAddModalOpen(true)}
+        className="fixed bottom-10 left-1/2 -translate-x-1/2 w-16 h-16 bg-[#4A4238] text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-40 group"
+      >
+        <Plus size={32} className="group-hover:rotate-90 transition-transform duration-500" />
+      </button>
+
+      {/* Decorative Background Elements */}
+      <div className="fixed top-[-10%] right-[-10%] w-[50%] aspect-square bg-[#DCCFBF]/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+      <div className="fixed bottom-[-5%] left-[-5%] w-[40%] aspect-square bg-[#EAE3DB]/20 rounded-full blur-[80px] pointer-events-none -z-10"></div>
+    </div>
+  );
+}
