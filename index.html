@@ -1,0 +1,385 @@
+import React, { useState, useMemo, useRef } from 'react';
+import { 
+  Plus, 
+  X, 
+  Coffee, 
+  Calendar, 
+  MapPin, 
+  ChevronLeft, 
+  ChevronRight,
+  Trash2,
+  CheckCircle2,
+  Clock,
+  Heart,
+  Camera,
+  Image as ImageIcon
+} from 'lucide-react';
+
+// --- Coffee Types & Icons ---
+const COFFEE_TYPES = [
+  { id: 'latte', name: 'Latte', icon: '☕' },
+  { id: 'americano', name: 'Americano', icon: '🥤' },
+  { id: 'dirty', name: 'Dirty', icon: '🥛' },
+  { id: 'handbrew', name: 'Pourover', icon: '⚗️' },
+  { id: 'flatwhite', name: 'Flat White', icon: '🎨' },
+];
+
+const INITIAL_LOGS = [
+  { id: 1, type: 'Latte', brand: 'Manner', price: 25, date: '2024-03-01', img: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?q=80&w=400&auto=format&fit=crop', notes: 'Smooth texture, rich milky aroma.', icon: '☕' },
+  { id: 2, type: 'Americano', brand: 'Starbucks', price: 30, date: '2024-03-05', img: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=400&auto=format&fit=crop', notes: 'Waking up with a bitter kick.', icon: '🥤' },
+];
+
+export default function App() {
+  const [logs, setLogs] = useState(INITIAL_LOGS);
+  const [selectedCoffee, setSelectedCoffee] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date(2024, 2, 1));
+  const fileInputRef = useRef(null);
+  
+  const [newCoffee, setNewCoffee] = useState({
+    brand: '',
+    type: 'Latte',
+    price: '',
+    date: new Date().toISOString().split('T')[0],
+    notes: '',
+    img: null 
+  });
+
+  const changeMonth = (offset) => {
+    const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
+    setCurrentDate(nextMonth);
+  };
+
+  const calendarDays = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const days = [];
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push({ id: `empty-${i}`, day: null, fullDate: null });
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
+      const dayLogs = logs.filter(l => l.date === dateStr);
+      days.push({ id: `day-${dateStr}`, day: i, fullDate: dateStr, dayLogs });
+    }
+    return days;
+  }, [currentDate, logs]);
+
+  const totalSpent = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    return logs
+      .filter(l => {
+        const d = new Date(l.date);
+        return d.getFullYear() === year && d.getMonth() === month;
+      })
+      .reduce((sum, l) => sum + l.price, 0);
+  }, [logs, currentDate]);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewCoffee({ ...newCoffee, img: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddCoffee = (e) => {
+    e.preventDefault();
+    const typeObj = COFFEE_TYPES.find(t => t.name === newCoffee.type);
+    const log = {
+      ...newCoffee,
+      id: Date.now(),
+      price: parseFloat(newCoffee.price) || 0,
+      icon: typeObj?.icon || '☕',
+      img: newCoffee.img || 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=400&auto=format&fit=crop'
+    };
+    setLogs([log, ...logs]);
+    setIsAddModalOpen(false);
+    setNewCoffee({
+      brand: '', type: 'Latte', price: '', notes: '',
+      date: new Date().toISOString().split('T')[0],
+      img: null
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FAF9F6] text-[#4A4238] font-sans pb-20 select-none">
+      <div className="fixed inset-0 pointer-events-none opacity-[0.05]">
+        <div className="absolute top-[20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-[#A89078] blur-[120px]" />
+      </div>
+
+      <div className="relative max-w-md mx-auto px-4 pt-12">
+        <header className="mb-10 flex flex-col items-center">
+          <div className="w-12 h-1 bg-[#4A4238] mb-6 rounded-full" />
+          <h1 className="text-4xl font-serif font-light tracking-tight mb-2">My Coffee Journal.</h1>
+          <div className="flex items-center gap-2 px-3 py-1 bg-white/50 backdrop-blur-sm rounded-full border border-white/50 shadow-sm">
+            <Heart size={10} className="text-[#A89078] fill-[#A89078]" />
+            <span className="text-[9px] text-[#A89078] font-bold uppercase tracking-widest">A cup of happiness every day</span>
+          </div>
+        </header>
+
+        <section className="mb-6 px-2 flex justify-between items-end">
+          <div className="flex items-center gap-4">
+            <button onClick={() => changeMonth(-1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-sm hover:scale-110 transition-transform">
+              <ChevronLeft size={16} />
+            </button>
+            <div className="text-center">
+              <span className="text-[10px] text-gray-400 font-bold uppercase block tracking-tighter">
+                {currentDate.getFullYear()}
+              </span>
+              <span className="text-xl font-serif leading-none">
+                {currentDate.toLocaleString('en-US', { month: 'long' })}
+              </span>
+            </div>
+            <button onClick={() => changeMonth(1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-sm hover:scale-110 transition-transform">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block tracking-widest mb-1">Monthly Spent</span>
+            <span className="text-lg font-serif text-[#A89078]">￥{totalSpent.toFixed(2)}</span>
+          </div>
+        </section>
+
+        <section className="bg-white/60 backdrop-blur-md p-4 rounded-[40px] border border-white shadow-xl">
+          <div className="grid grid-cols-7 gap-1 mb-4">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => (
+              <div key={`${d}-${idx}`} className="text-[9px] text-center text-gray-300 font-black py-2">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-y-4 gap-x-1">
+            {calendarDays.map((item) => {
+              const isToday = item.fullDate === new Date().toISOString().split('T')[0];
+              const dayLog = item.dayLogs?.[0]; 
+
+              return (
+                <div key={item.id} className="flex flex-col items-center">
+                  <button 
+                    disabled={!item.day}
+                    onClick={() => dayLog ? setSelectedCoffee(dayLog) : (item.fullDate && (setNewCoffee({...newCoffee, date: item.fullDate}), setIsAddModalOpen(true)))}
+                    className={`
+                      w-11 h-11 rounded-2xl flex flex-col items-center justify-center transition-all relative
+                      ${!item.day ? 'opacity-0 cursor-default' : 'hover:scale-110 active:scale-95 cursor-pointer'}
+                      ${dayLog ? 'bg-transparent' : 'bg-[#F9F7F4] border border-transparent'}
+                      ${isToday && !dayLog ? 'border-[#A89078] bg-white' : ''}
+                    `}
+                  >
+                    {dayLog ? (
+                      <div className="relative group">
+                        <div className="text-2xl animate-in zoom-in duration-300 transform rotate-[-5deg] drop-shadow-md">
+                          {dayLog.icon}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-white/80 rounded-md px-1 py-0.5 text-[8px] font-bold text-[#A89078] shadow-sm">
+                          {item.day}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className={`text-[10px] font-medium ${isToday ? 'text-[#A89078]' : 'text-[#D1C7BD]'}`}>
+                        {item.day}
+                      </span>
+                    )}
+
+                    {item.dayLogs?.length > 1 && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-400 text-white text-[8px] rounded-full flex items-center justify-center border border-white">
+                        {item.dayLogs.length}
+                      </div>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="mt-8 text-center px-8">
+          <p className="text-[10px] text-gray-400 italic">"Every sticker is a gentle reminder of life's warmth."</p>
+        </div>
+
+        <div className="fixed bottom-8 left-0 right-0 px-8 flex justify-center z-40 pointer-events-none">
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="pointer-events-auto flex items-center gap-3 bg-[#4A4238] text-white px-8 py-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all group"
+          >
+            <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+            <span className="text-xs font-bold tracking-widest uppercase">Add Moment</span>
+          </button>
+        </div>
+
+        {selectedCoffee && (
+          <div className="fixed inset-0 bg-[#4A4238]/60 backdrop-blur-md flex items-center justify-center z-50 p-6 animate-in fade-in">
+            <div className="bg-white w-full max-w-sm rounded-[48px] overflow-hidden shadow-2xl animate-in zoom-in duration-300">
+              <div className="relative h-64">
+                <img src={selectedCoffee.img} className="w-full h-full object-cover" alt="coffee" />
+                <button 
+                  onClick={() => setSelectedCoffee(null)}
+                  className="absolute top-6 left-6 w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button 
+                  onClick={() => {
+                    setLogs(logs.filter(l => l.id !== selectedCoffee.id));
+                    setSelectedCoffee(null);
+                  }}
+                  className="absolute top-6 right-6 w-10 h-10 bg-red-500/20 backdrop-blur-md rounded-full flex items-center justify-center text-white"
+                >
+                  <Trash2 size={18} />
+                </button>
+                <div className="absolute -bottom-10 right-8 text-7xl opacity-20 transform rotate-12 select-none pointer-events-none">
+                  {selectedCoffee.icon}
+                </div>
+              </div>
+
+              <div className="p-8 pt-10">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h2 className="text-3xl font-serif leading-tight mb-2">{selectedCoffee.brand}</h2>
+                    <span className="px-3 py-1 bg-[#F3EFEA] rounded-full text-[10px] font-bold text-[#A89078] uppercase tracking-widest">
+                      {selectedCoffee.type}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-serif text-[#A89078]">￥{selectedCoffee.price}</span>
+                  </div>
+                </div>
+                
+                <div className="relative bg-[#FAF9F6] p-5 rounded-3xl border border-[#F0EBE3] mb-6">
+                   <p className="text-xs text-gray-500 leading-relaxed italic">
+                     "{selectedCoffee.notes || 'Coffee is always a good idea.'}"
+                   </p>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-gray-300 font-bold tracking-widest border-t border-[#F0EBE3] pt-6 uppercase">
+                  <div className="flex items-center gap-1">
+                    <Calendar size={12} /> {selectedCoffee.date}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MapPin size={12} /> Memory Card
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isAddModalOpen && (
+          <div className="fixed inset-0 bg-[#4A4238]/40 backdrop-blur-md flex items-end sm:items-center justify-center z-50 p-4 animate-in fade-in">
+            <div className="bg-[#FAF9F6] w-full max-w-md rounded-[48px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-500 max-h-[90vh] overflow-y-auto">
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-8">
+                  <h2 className="text-2xl font-serif">New Sticker.</h2>
+                  <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddCoffee} className="space-y-5">
+                  {/* Photo Upload Entry */}
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#A89078] mb-2 tracking-widest">Photo</label>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      ref={fileInputRef} 
+                      onChange={handleImageUpload}
+                    />
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full aspect-[16/9] bg-white border-2 border-dashed border-[#F0EBE3] rounded-[32px] flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors overflow-hidden group relative"
+                    >
+                      {newCoffee.img ? (
+                        <>
+                          <img src={newCoffee.img} className="w-full h-full object-cover" alt="Preview" />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                             <Camera className="text-white" />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 bg-[#F9F7F4] rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                            <ImageIcon size={20} className="text-[#A89078]" />
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tighter">Click to upload photo</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-[#A89078] mb-2 tracking-widest">Brand</label>
+                      <input 
+                        required type="text" placeholder="Cafe name..."
+                        className="w-full bg-white border border-white rounded-2xl p-4 text-sm focus:outline-none shadow-sm"
+                        value={newCoffee.brand}
+                        onChange={(e) => setNewCoffee({...newCoffee, brand: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-[#A89078] mb-2 tracking-widest">Price</label>
+                      <input 
+                        required type="number" placeholder="￥"
+                        className="w-full bg-white border border-white rounded-2xl p-4 text-sm focus:outline-none shadow-sm"
+                        value={newCoffee.price}
+                        onChange={(e) => setNewCoffee({...newCoffee, price: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#A89078] mb-2 tracking-widest">Type</label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {COFFEE_TYPES.map(type => (
+                        <button
+                          key={type.id} type="button"
+                          onClick={() => setNewCoffee({...newCoffee, type: type.name})}
+                          className={`aspect-square rounded-2xl text-lg flex items-center justify-center transition-all ${
+                            newCoffee.type === type.name ? 'bg-[#4A4238] scale-110 shadow-lg' : 'bg-white shadow-sm grayscale opacity-50'
+                          }`}
+                        >
+                          {type.icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#A89078] mb-2 tracking-widest">Date</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-white border border-white rounded-2xl p-4 text-sm focus:outline-none shadow-sm"
+                      value={newCoffee.date}
+                      onChange={(e) => setNewCoffee({...newCoffee, date: e.target.value})}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-[#A89078] mb-2 tracking-widest">Note</label>
+                    <textarea 
+                      rows="2" placeholder="Your feelings..."
+                      className="w-full bg-white border border-white rounded-2xl p-4 text-sm focus:outline-none shadow-sm resize-none"
+                      value={newCoffee.notes}
+                      onChange={(e) => setNewCoffee({...newCoffee, notes: e.target.value})}
+                    />
+                  </div>
+
+                  <button type="submit" className="w-full bg-[#4A4238] text-white py-5 rounded-[28px] font-bold text-sm tracking-[0.2em] shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-95">
+                    <CheckCircle2 size={18} /> CONFIRM BREW
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
