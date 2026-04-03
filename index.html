@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Coffee Daily | 咖啡打卡</title>
+    
+    <style>
+        :root { --bg: #FAF9F6; --brown: #4A4238; --accent: #A89078; }
+        body { background: var(--bg); margin: 0; font-family: system-ui, -apple-system, sans-serif; color: var(--brown); }
+        #loading-screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); z-index: 100; }
+        .spinner { width: 30px; height: 30px; border: 2px solid #EAE3DB; border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+
+    <script src="https://cdn.staticfile.org/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.staticfile.org/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.staticfile.org/babel-standalone/7.22.17/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <div class="text-center">
+            <div class="spinner mx-auto mb-4"></div>
+            <p style="font-size: 12px; color: #A89078; letter-spacing: 0.1em;">COFFEE LOADING...</p>
+        </div>
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // 确保页面加载完成后再移除 loading 界面
+        const { useState, useEffect } = React;
+
+        function App() {
+            useEffect(() => {
+                const loader = document.getElementById('loading-screen');
+                if (loader) loader.style.display = 'none';
+            }, []);
+
+            const [logs, setLogs] = useState([
+                { id: 1, type: '拿铁 Latte', brand: 'Manner', price: 25, date: '2023-10-01', img: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=400' },
+                { id: 2, type: '美式 Americano', brand: 'Starbucks', price: 30, date: '2023-10-02', img: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=400' },
+            ]);
+            const [viewing, setViewing] = useState(null);
+
+            return (
+                <div className="max-w-md mx-auto min-h-screen px-6 py-12">
+                    {/* Header */}
+                    <header className="text-center mb-12">
+                        <h1 className="text-3xl font-light tracking-[0.2em] mb-2" style={{fontFamily:'serif'}}>COFFEE.</h1>
+                        <p className="text-[10px] tracking-widest text-stone-400 uppercase">Aesthetic Daily Record</p>
+                    </header>
+
+                    {/* Quick Add Icons */}
+                    <div className="flex overflow-x-auto gap-6 pb-8 no-scrollbar">
+                        {['☕', '🥤', '🥛', '⚗️', '🎨'].map((emoji, idx) => (
+                            <button key={idx} className="flex-shrink-0 w-14 h-14 bg-white rounded-full shadow-sm flex items-center justify-center text-xl active:scale-90 transition-transform">
+                                {emoji}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className="bg-white/50 border border-white rounded-[32px] p-6 mb-10 shadow-sm">
+                        <div className="flex justify-between text-[10px] font-bold mb-4 px-1 tracking-tighter opacity-40">
+                            <span>MONTHLY LOG</span>
+                            <span>OCTOBER</span>
+                        </div>
+                        <div className="grid grid-cols-7 gap-3">
+                            {Array.from({ length: 31 }).map((_, i) => (
+                                <div key={i} className={`aspect-square rounded-full flex items-center justify-center text-[10px] ${i < 2 ? 'bg-[#A89078] text-white' : 'text-stone-300 border border-stone-100'}`}>
+                                    {i + 1}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* History List */}
+                    <div className="space-y-4">
+                        {logs.map(log => (
+                            <div key={log.id} onClick={() => setViewing(log)} className="bg-white p-3 rounded-3xl flex items-center shadow-sm hover:shadow-md transition-all cursor-pointer">
+                                <img src={log.img} className="w-16 h-16 rounded-2xl object-cover" />
+                                <div className="ml-4 flex-1">
+                                    <p className="text-xs font-bold">{log.brand}</p>
+                                    <p className="text-[10px] text-stone-400 mt-1">{log.type}</p>
+                                </div>
+                                <div className="text-xs font-serif italic mr-2">￥{log.price}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Detail Overlay */}
+                    {viewing && (
+                        <div className="fixed inset-0 z-50 flex items-end justify-center p-4" onClick={() => setViewing(null)}>
+                            <div className="absolute inset-0 bg-stone-900/20 backdrop-blur-sm"></div>
+                            <div className="bg-white w-full max-w-sm rounded-[40px] overflow-hidden relative z-10 animate-slide-up" onClick={e => e.stopPropagation()}>
+                                <img src={viewing.img} className="w-full h-64 object-cover" />
+                                <div className="p-8">
+                                    <h2 className="text-2xl font-light mb-2 text-center tracking-wide">{viewing.brand}</h2>
+                                    <p className="text-center text-[10px] text-stone-400 tracking-[0.2em] uppercase mb-6 border-b pb-6">{viewing.type}</p>
+                                    <div className="flex justify-around text-center">
+                                        <div>
+                                            <p className="text-[10px] text-stone-300 mb-1">PRICE</p>
+                                            <p className="font-serif">￥{viewing.price}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-stone-300 mb-1">DATE</p>
+                                            <p className="font-serif">{viewing.date}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setViewing(null)} className="w-full mt-8 py-3 bg-stone-100 rounded-2xl text-xs tracking-widest text-stone-500">CLOSE</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    </style>
+</body>
+</html>
