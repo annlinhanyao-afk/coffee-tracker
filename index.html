@@ -90,6 +90,7 @@ body {
   box-shadow: 0 4px 12px rgba(255, 143, 168, 0.18);
 }
 .icon-btn:hover { background: var(--accent-soft); transform: scale(1.05); }
+.icon-btn svg { width: 17px; height: 17px; }
 
 .canvas-area {
   flex: 1;
@@ -149,6 +150,31 @@ body {
   margin-bottom: 14px;
 }
 
+.mode-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.mode-btn {
+  padding: 6px 18px;
+  border-radius: 16px;
+  border: 1.5px solid var(--accent-soft);
+  background: var(--card);
+  color: var(--text-soft);
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.mode-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  border-color: transparent;
+}
+
 .color-picker {
   display: flex;
   gap: 12px;
@@ -190,6 +216,8 @@ body {
   transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
 }
 .action-btn:active { transform: scale(0.95); }
+.action-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.action-btn svg { width: 14px; height: 14px; }
 .action-btn.primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-dark));
   color: #fff;
@@ -220,13 +248,14 @@ body {
   border-radius: 50%;
   background: var(--card);
   display: flex; align-items: center; justify-content: center;
-  font-size: 36px;
+  color: var(--accent-dark);
   margin-bottom: 20px;
   cursor: pointer;
   transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
   border: 1.5px dashed var(--accent);
   box-shadow: 0 10px 28px rgba(255, 143, 168, 0.25);
 }
+.upload-circle svg { width: 34px; height: 34px; }
 .upload-circle:hover { background: var(--accent-soft); transform: scale(1.05); box-shadow: 0 14px 32px rgba(255, 143, 168, 0.32); }
 
 .upload-title {
@@ -276,6 +305,7 @@ body {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 .board-add-btn:hover { transform: scale(1.08); box-shadow: 0 12px 30px rgba(255, 111, 146, 0.5); }
+.board-add-btn svg { width: 22px; height: 22px; }
 
 input[type="file"] { display: none; }
 </style>
@@ -284,18 +314,27 @@ input[type="file"] { display: none; }
 
 <!-- 上传界面 -->
 <div id="upload-state">
-  <div class="upload-circle" onclick="activateGyro(); document.getElementById('imgInput').click()">📷</div>
+  <div class="upload-circle" onclick="activateGyro(); document.getElementById('imgInput').click()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-1.5h7L16.5 7h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/>
+      <circle cx="12" cy="13" r="3.4"/>
+    </svg>
+  </div>
   <div class="upload-title">生活碎片</div>
-  <div class="upload-sub">上传图片，手绘圈选<br>捕捉每一个瞬间</div>
+  <div class="upload-sub">上传图片，点击描出边缘<br>捕捉每一个瞬间</div>
   <input type="file" id="imgInput" accept="image/*">
 </div>
 
 <!-- 编辑器 -->
 <div id="editor" style="display:none">
   <div class="top-bar">
-    <button class="icon-btn" id="backBtn">✕</button>
+    <button class="icon-btn" id="backBtn" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
     <div class="title">圈选碎片</div>
-    <button class="icon-btn" id="clearPathBtn">↺</button>
+    <button class="icon-btn" id="clearPathBtn" aria-label="撤销上一个点">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10h9a4 4 0 0 1 0 8h-2"/><path d="M10 6l-4 4 4 4"/></svg>
+    </button>
   </div>
   <div class="canvas-area">
     <div class="canvas-card">
@@ -306,7 +345,11 @@ input[type="file"] { display: none; }
     </div>
   </div>
   <div class="bottom-bar">
-    <div class="hint-text">用手指圈出想要的部分</div>
+    <div class="hint-text">依次点击边缘，连出想要的形状</div>
+    <div class="mode-toggle" id="modeToggle">
+      <button class="mode-btn active" data-mode="straight">直线</button>
+      <button class="mode-btn" data-mode="curve">曲线</button>
+    </div>
     <div class="color-picker" id="colorPicker">
       <button class="color-dot active" data-color="#ffffff" style="background:#ffffff" aria-label="白色边框"></button>
       <button class="color-dot" data-color="#FF8FA8" style="background:#FF8FA8" aria-label="粉色边框"></button>
@@ -317,7 +360,10 @@ input[type="file"] { display: none; }
     </div>
     <div class="actions">
       <button class="action-btn secondary" id="cancelBtn">取消</button>
-      <button class="action-btn primary" id="captureBtn">✨ 捕捉碎片</button>
+      <button class="action-btn primary" id="captureBtn">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.6 3.4 1.9 5.6 5 6-3.1.4-4.4 2.6-5 6-.6-3.4-1.9-5.6-5-6 3.1-.4 4.4-2.6 5-6z"/></svg>
+        捕捉碎片
+      </button>
     </div>
   </div>
 </div>
@@ -327,7 +373,9 @@ input[type="file"] { display: none; }
   <div class="board-bg"></div>
 </div>
 <div id="sticker-layer"></div>
-<button class="board-add-btn" id="addMoreBtn">+</button>
+<button class="board-add-btn" id="addMoreBtn" aria-label="添加照片">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
 
 <script>
 const imgInput = document.getElementById('imgInput');
@@ -343,15 +391,24 @@ const stickerLayer = document.getElementById('sticker-layer');
 
 let img = null;
 let lasso = [];
-let drawing = false;
 let stickerCount = 0;
 let borderColor = '#ffffff';
+let curveMode = false;
 
 document.querySelectorAll('.color-dot').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.color-dot').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     borderColor = btn.dataset.color;
+  });
+});
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    curveMode = btn.dataset.mode === 'curve';
+    drawLassoPreview();
   });
 });
 
@@ -418,42 +475,59 @@ function chaikinSmooth(points, iterations, closed) {
   return pts;
 }
 
-// Builds a smoothed, rounded path through the lasso points so both the live
-// preview and the final die-cut border look like a clean sticker outline
-// rather than the user's exact jagged finger trace.
+// Builds the path through the placed points, either as straight segments
+// or - when curve mode is on - smoothed with Chaikin corner-cutting so the
+// die-cut border looks like a clean rounded sticker outline.
 function tracePath(context, points, mapPoint, closed) {
   if (points.length < 2) return;
-  const smoothed = chaikinSmooth(points, 2, closed).map(mapPoint);
-  context.moveTo(smoothed[0].x, smoothed[0].y);
-  for (let i = 1; i < smoothed.length; i++) context.lineTo(smoothed[i].x, smoothed[i].y);
+  const pts = curveMode ? chaikinSmooth(points, 2, closed) : points;
+  const mapped = pts.map(mapPoint);
+  context.moveTo(mapped[0].x, mapped[0].y);
+  for (let i = 1; i < mapped.length; i++) context.lineTo(mapped[i].x, mapped[i].y);
   if (closed) context.closePath();
 }
 
 const identity = p => p;
 
 // Cheap: only clears/redraws the small transparent overlay, never the photo.
+// The path stays open (not auto-closed) while the user is still placing
+// points; it's only closed at capture time.
 function drawLassoPreview() {
   lctx.clearRect(0, 0, lassoCanvas.width, lassoCanvas.height);
-  if (lasso.length < 2) return;
+  if (lasso.length < 1) return;
   lctx.save();
   lctx.lineJoin = 'round';
   lctx.lineCap = 'round';
 
-  // White base stroke so the line stays visible on dark photos
-  lctx.beginPath();
-  tracePath(lctx, lasso, identity, !drawing);
-  lctx.strokeStyle = 'rgba(255,255,255,0.9)';
-  lctx.lineWidth = 5;
-  lctx.stroke();
+  if (lasso.length > 1) {
+    // White base stroke so the line stays visible on dark photos
+    lctx.beginPath();
+    tracePath(lctx, lasso, identity, false);
+    lctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    lctx.lineWidth = 5;
+    lctx.stroke();
 
-  // Coral dashed stroke on top for the marching-ants effect
-  lctx.beginPath();
-  tracePath(lctx, lasso, identity, !drawing);
-  lctx.setLineDash([8, 5]);
-  lctx.lineDashOffset = -(Date.now() / 30);
-  lctx.strokeStyle = '#FF6F92';
-  lctx.lineWidth = 2.5;
-  lctx.stroke();
+    // Coral dashed stroke on top for the marching-ants effect
+    lctx.beginPath();
+    tracePath(lctx, lasso, identity, false);
+    lctx.setLineDash([8, 5]);
+    lctx.lineDashOffset = -(Date.now() / 30);
+    lctx.strokeStyle = '#FF6F92';
+    lctx.lineWidth = 2.5;
+    lctx.stroke();
+  }
+
+  // Dot markers at each placed vertex; the first point is highlighted so
+  // it's clear where to tap to close the shape when capturing.
+  lasso.forEach((p, i) => {
+    lctx.beginPath();
+    lctx.arc(p.x, p.y, i === 0 ? 6 : 4.5, 0, Math.PI * 2);
+    lctx.fillStyle = i === 0 ? '#FF6F92' : '#ffffff';
+    lctx.strokeStyle = i === 0 ? '#ffffff' : '#FF6F92';
+    lctx.lineWidth = 1.5;
+    lctx.fill();
+    lctx.stroke();
+  });
 
   lctx.restore();
 }
@@ -489,30 +563,23 @@ function getPos(e) {
   };
 }
 
-// Skip points that are too close together (sub-pixel jitter from
-// high-frequency touch events) so the path array and per-frame smoothing
-// stay cheap during a long drag.
-function pushPoint(p) {
-  const last = lasso[lasso.length - 1];
-  if (last) {
-    const dx = p.x - last.x, dy = p.y - last.y;
-    if (dx * dx + dy * dy < 9) return;
-  }
+// Each tap/click places one vertex; consecutive vertices are connected by
+// a straight (or, in curve mode, smoothed) line - no continuous dragging.
+function addPoint(p) {
   lasso.push(p);
   drawLassoPreview();
+  startLassoAnim();
 }
 
-canvas.addEventListener('mousedown', e => { drawing = true; lasso = [getPos(e)]; startLassoAnim(); });
-canvas.addEventListener('mousemove', e => { if (!drawing) return; pushPoint(getPos(e)); });
-canvas.addEventListener('mouseup', () => { drawing = false; drawLassoPreview(); });
+canvas.addEventListener('click', e => { addPoint(getPos(e)); });
+// preventDefault on touchend suppresses the synthetic click Chrome/Safari
+// fire after a tap, so a touch doesn't add the point twice.
+canvas.addEventListener('touchend', e => { e.preventDefault(); addPoint(getPos(e.changedTouches[0])); }, {passive:false});
 
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; lasso = [getPos(e.touches[0])]; startLassoAnim(); }, {passive:false});
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; pushPoint(getPos(e.touches[0])); }, {passive:false});
-canvas.addEventListener('touchend', e => { e.preventDefault(); drawing = false; drawLassoPreview(); }, {passive:false});
-
-// Clear lasso
+// Undo the last placed point
 document.getElementById('clearPathBtn').addEventListener('click', () => {
-  lasso = []; clearLassoPreview();
+  lasso.pop();
+  drawLassoPreview();
 });
 
 // Back to board
@@ -585,12 +652,13 @@ let gyroActive = false;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+// Only left/right tilt (gamma) steers gravity; gravityY stays fixed
+// straight down so the board never flips upside down when tilting the
+// phone forward/back.
 function onDeviceOrientation(e) {
-  if (e.beta == null || e.gamma == null) return;
-  const gamma = clamp(e.gamma, -45, 45);      // left/right tilt
-  const relBeta = clamp(e.beta - 90, -45, 45); // front/back tilt from upright
+  if (e.gamma == null) return;
+  const gamma = clamp(e.gamma, -45, 45);
   gravityX = gamma / 45;
-  gravityY = relBeta / 45;
 }
 
 function activateGyro() {
