@@ -111,6 +111,14 @@ body {
   max-height: 100%;
 }
 
+.canvas-wrap {
+  position: relative;
+  display: block;
+  line-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 #main-canvas {
   max-width: 100%;
   max-height: 100%;
@@ -118,6 +126,15 @@ body {
   cursor: crosshair;
   display: block;
   touch-action: none;
+}
+
+#lasso-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 16px;
 }
 
 .bottom-bar {
@@ -258,7 +275,10 @@ input[type="file"] { display: none; }
   </div>
   <div class="canvas-area">
     <div class="canvas-card">
-      <canvas id="main-canvas"></canvas>
+      <div class="canvas-wrap">
+        <canvas id="main-canvas"></canvas>
+        <canvas id="lasso-canvas"></canvas>
+      </div>
     </div>
   </div>
   <div class="bottom-bar">
@@ -285,6 +305,8 @@ const boardState = document.getElementById('board-state');
 const addMoreBtn = document.getElementById('addMoreBtn');
 const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
+const lassoCanvas = document.getElementById('lasso-canvas');
+const lctx = lassoCanvas.getContext('2d');
 const stickerLayer = document.getElementById('sticker-layer');
 
 let img = null;
@@ -320,38 +342,83 @@ function setupCanvas() {
   const scale = Math.min(maxW / img.width, maxH / img.height, 1);
   canvas.width = img.width * scale;
   canvas.height = img.height * scale;
+  lassoCanvas.width = canvas.width;
+  lassoCanvas.height = canvas.height;
   redrawCanvas();
 }
 
+// Draws the base photo only. Not called from the drawing loop, so it never
+// has to fight with the lasso animation for the main thread.
 function redrawCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  if (lasso.length > 1) drawLasso();
 }
 
-function drawLasso() {
-  ctx.save();
-  ctx.strokeStyle = '#FF6F92';
-  ctx.lineWidth = 3;
-  ctx.setLineDash([6, 4]);
-  ctx.lineDashOffset = Date.now() / 40;
-  ctx.shadowColor = 'rgba(255,255,255,0.9)';
-  ctx.shadowBlur = 6;
-  ctx.beginPath();
-  lasso.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-  if (!drawing) ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
+// Builds a rounded path through the lasso points (quadratic curve through
+// each midpoint) instead of a jagged polyline, so both the live preview and
+// the final die-cut border look like a clean sticker outline.
+function tracePath(context, points, mapPoint, closed) {
+  if (points.length < 2) return;
+  const p0 = mapPoint(points[0]);
+  context.moveTo(p0.x, p0.y);
+  for (let i = 1; i < points.length - 1; i++) {
+    const cur = mapPoint(points[i]);
+    const next = mapPoint(points[i + 1]);
+    context.quadraticCurveTo(cur.x, cur.y, (cur.x + next.x) / 2, (cur.y + next.y) / 2);
+  }
+  const last = mapPoint(points[points.length - 1]);
+  context.lineTo(last.x, last.y);
+  if (closed) context.closePath();
 }
 
-// Animate lasso dash
+const identity = p => p;
+
+// Cheap: only clears/redraws the small transparent overlay, never the photo.
+function drawLassoPreview() {
+  lctx.clearRect(0, 0, lassoCanvas.width, lassoCanvas.height);
+  if (lasso.length < 2) return;
+  lctx.save();
+  lctx.lineJoin = 'round';
+  lctx.lineCap = 'round';
+
+  // White base stroke so the line stays visible on dark photos
+  lctx.beginPath();
+  tracePath(lctx, lasso, identity, !drawing);
+  lctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  lctx.lineWidth = 5;
+  lctx.stroke();
+
+  // Coral dashed stroke on top for the marching-ants effect
+  lctx.beginPath();
+  tracePath(lctx, lasso, identity, !drawing);
+  lctx.setLineDash([8, 5]);
+  lctx.lineDashOffset = -(Date.now() / 30);
+  lctx.strokeStyle = '#FF6F92';
+  lctx.lineWidth = 2.5;
+  lctx.stroke();
+
+  lctx.restore();
+}
+
+function clearLassoPreview() {
+  lctx.clearRect(0, 0, lassoCanvas.width, lassoCanvas.height);
+}
+
+// Drives the marching-ants dash animation. Runs at most while a path
+// exists; it only touches the small overlay canvas, so leaving it running
+// after the finger lifts (until capture/clear) costs almost nothing.
 let lassoAnim = null;
 function startLassoAnim() {
   if (lassoAnim) return;
-  lassoAnim = requestAnimationFrame(function loop() {
-    if (lasso.length > 1) { redrawCanvas(); lassoAnim = requestAnimationFrame(loop); }
-    else lassoAnim = null;
-  });
+  const loop = () => {
+    drawLassoPreview();
+    if (lasso.length > 1) {
+      lassoAnim = requestAnimationFrame(loop);
+    } else {
+      lassoAnim = null;
+    }
+  };
+  lassoAnim = requestAnimationFrame(loop);
 }
 
 function getPos(e) {
@@ -364,27 +431,42 @@ function getPos(e) {
   };
 }
 
-canvas.addEventListener('mousedown', e => { drawing = true; lasso = [getPos(e)]; });
-canvas.addEventListener('mousemove', e => { if (!drawing) return; lasso.push(getPos(e)); startLassoAnim(); });
-canvas.addEventListener('mouseup', () => { drawing = false; });
+// Skip points that are too close together (sub-pixel jitter from
+// high-frequency touch events) so the path array and per-frame smoothing
+// stay cheap during a long drag.
+function pushPoint(p) {
+  const last = lasso[lasso.length - 1];
+  if (last) {
+    const dx = p.x - last.x, dy = p.y - last.y;
+    if (dx * dx + dy * dy < 9) return;
+  }
+  lasso.push(p);
+  drawLassoPreview();
+}
 
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; lasso = [getPos(e.touches[0])]; }, {passive:false});
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; lasso.push(getPos(e.touches[0])); startLassoAnim(); }, {passive:false});
-canvas.addEventListener('touchend', e => { e.preventDefault(); drawing = false; }, {passive:false});
+canvas.addEventListener('mousedown', e => { drawing = true; lasso = [getPos(e)]; startLassoAnim(); });
+canvas.addEventListener('mousemove', e => { if (!drawing) return; pushPoint(getPos(e)); });
+canvas.addEventListener('mouseup', () => { drawing = false; drawLassoPreview(); });
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; lasso = [getPos(e.touches[0])]; startLassoAnim(); }, {passive:false});
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; pushPoint(getPos(e.touches[0])); }, {passive:false});
+canvas.addEventListener('touchend', e => { e.preventDefault(); drawing = false; drawLassoPreview(); }, {passive:false});
 
 // Clear lasso
 document.getElementById('clearPathBtn').addEventListener('click', () => {
-  lasso = []; redrawCanvas();
+  lasso = []; clearLassoPreview();
 });
 
 // Back to board
 document.getElementById('backBtn').addEventListener('click', () => {
   lasso = [];
+  clearLassoPreview();
   editorEl.style.display = 'none';
 });
 
 document.getElementById('cancelBtn').addEventListener('click', () => {
   lasso = [];
+  clearLassoPreview();
   editorEl.style.display = 'none';
 });
 
@@ -407,36 +489,31 @@ document.getElementById('captureBtn').addEventListener('click', () => {
   off.width = w + pad * 2;
   off.height = h + pad * 2;
   const octx = off.getContext('2d');
-
-  const tracePath = () => {
-    octx.beginPath();
-    lasso.forEach((p, i) => {
-      const px = p.x - minX + pad;
-      const py = p.y - minY + pad;
-      i === 0 ? octx.moveTo(px, py) : octx.lineTo(px, py);
-    });
-    octx.closePath();
-  };
+  const mapPoint = p => ({ x: p.x - minX + pad, y: p.y - minY + pad });
 
   // Clip to lasso shape and draw the captured image
   octx.save();
-  tracePath();
+  octx.beginPath();
+  tracePath(octx, lasso, mapPoint, true);
   octx.clip();
   octx.drawImage(canvas, -minX + pad, -minY + pad);
   octx.restore();
 
-  // White outline, drawn unclipped so it's actually visible around the cutout
+  // Solid white die-cut outline, drawn unclipped so it's fully visible
+  // around the cutout like a printed sticker border.
   octx.save();
-  octx.strokeStyle = 'rgba(255,255,255,0.95)';
-  octx.lineWidth = 7;
+  octx.strokeStyle = '#ffffff';
+  octx.lineWidth = 10;
   octx.lineJoin = 'round';
-  tracePath();
+  octx.lineCap = 'round';
+  octx.beginPath();
+  tracePath(octx, lasso, mapPoint, true);
   octx.stroke();
   octx.restore();
 
   createSticker(off.toDataURL(), off.width, off.height);
   lasso = [];
-  redrawCanvas();
+  clearLassoPreview();
   editorEl.style.display = 'none';
 });
 
