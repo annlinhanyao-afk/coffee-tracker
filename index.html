@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FFF7F1">
+<title>生活碎片</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #FFF7F1;
+  --card: #FFFFFF;
+  --accent: #FF8FA8;
+  --accent-dark: #FF6F92;
+  --accent-soft: #FFE3EA;
+  --mint: #BDEFDD;
+  --lavender: #E4DBFB;
+  --text: #4A3F3D;
+  --text-soft: rgba(74, 63, 61, 0.55);
+  --shadow-warm: rgba(255, 143, 168, 0.28);
+}
+
+body {
+  background: var(--bg);
+  font-family: 'PingFang SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  min-height: 100vh;
+  overflow: hidden;
+  color: var(--text);
+}
+
+/* 漂浮贴纸层 */
+#sticker-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.sticker {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+  animation: floatIn 0.5s cubic-bezier(0.34,1.4,0.64,1) forwards;
+  filter: drop-shadow(0 10px 20px var(--shadow-warm)) drop-shadow(0 2px 6px rgba(0,0,0,0.06));
+  user-select: none;
+}
+.sticker:active { cursor: grabbing; }
+
+@keyframes floatIn {
+  from { opacity: 0; transform: scale(0.4) rotate(-8deg); }
+  to { opacity: 1; transform: scale(1) rotate(var(--rot)); }
+}
+
+/* 编辑器 */
+#editor {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  background: var(--bg);
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  flex-shrink: 0;
+}
+
+.top-bar .title {
+  font-size: 16px;
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.icon-btn {
+  background: var(--card);
+  border: none;
+  color: var(--text);
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, transform 0.15s;
+  box-shadow: 0 4px 12px rgba(255, 143, 168, 0.18);
+}
+.icon-btn:hover { background: var(--accent-soft); transform: scale(1.05); }
+
+.canvas-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-card {
+  background: var(--card);
+  padding: 8px;
+  border-radius: 22px;
+  box-shadow: 0 12px 32px rgba(255, 143, 168, 0.22);
+  display: flex;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#main-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 16px;
+  cursor: crosshair;
+  display: block;
+  touch-action: none;
+}
+
+.bottom-bar {
+  padding: 16px 20px 32px;
+  flex-shrink: 0;
+}
+
+.hint-text {
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.action-btn {
+  padding: 11px 24px;
+  border-radius: 24px;
+  border: none;
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+}
+.action-btn:active { transform: scale(0.95); }
+.action-btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(255, 111, 146, 0.35);
+}
+.action-btn.primary:hover { box-shadow: 0 10px 24px rgba(255, 111, 146, 0.45); }
+.action-btn.secondary {
+  background: var(--card);
+  color: var(--accent-dark);
+  border: 1.5px solid var(--accent-soft);
+}
+.action-btn.secondary:hover { background: var(--accent-soft); }
+
+/* 上传状态 */
+#upload-state {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  background: radial-gradient(ellipse at 30% 30%, #FFE8EE 0%, var(--bg) 65%);
+}
+
+.upload-circle {
+  width: 92px; height: 92px;
+  border-radius: 50%;
+  background: var(--card);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+  border: 1.5px dashed var(--accent);
+  box-shadow: 0 10px 28px rgba(255, 143, 168, 0.25);
+}
+.upload-circle:hover { background: var(--accent-soft); transform: scale(1.05); box-shadow: 0 14px 32px rgba(255, 143, 168, 0.32); }
+
+.upload-title {
+  font-size: 19px;
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+.upload-sub {
+  font-size: 13px;
+  color: var(--text-soft);
+  text-align: center;
+  line-height: 1.7;
+}
+
+/* 贴纸板 */
+#board-state {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: none;
+}
+
+.board-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 25% 20%, #FFE8EE 0%, #FFF7F1 45%, #F1ECFC 100%);
+}
+
+.board-add-btn {
+  position: fixed;
+  bottom: 36px;
+  right: 24px;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 10px 26px rgba(255, 111, 146, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.board-add-btn:hover { transform: scale(1.08); box-shadow: 0 12px 30px rgba(255, 111, 146, 0.5); }
+
+input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+
+<!-- 上传界面 -->
+<div id="upload-state">
+  <div class="upload-circle" onclick="document.getElementById('imgInput').click()">📷</div>
+  <div class="upload-title">生活碎片</div>
+  <div class="upload-sub">上传图片，手绘圈选<br>捕捉每一个瞬间</div>
+  <input type="file" id="imgInput" accept="image/*">
+</div>
+
+<!-- 编辑器 -->
+<div id="editor" style="display:none">
+  <div class="top-bar">
+    <button class="icon-btn" id="backBtn">✕</button>
+    <div class="title">圈选碎片</div>
+    <button class="icon-btn" id="clearPathBtn">↺</button>
+  </div>
+  <div class="canvas-area">
+    <div class="canvas-card">
+      <canvas id="main-canvas"></canvas>
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <div class="hint-text">用手指圈出想要的部分</div>
+    <div class="actions">
+      <button class="action-btn secondary" id="cancelBtn">取消</button>
+      <button class="action-btn primary" id="captureBtn">✨ 捕捉碎片</button>
+    </div>
+  </div>
+</div>
+
+<!-- 贴纸漂浮板 -->
+<div id="board-state">
+  <div class="board-bg"></div>
+</div>
+<div id="sticker-layer"></div>
+<button class="board-add-btn" id="addMoreBtn">+</button>
+
+<script>
+const imgInput = document.getElementById('imgInput');
+const uploadState = document.getElementById('upload-state');
+const editorEl = document.getElementById('editor');
+const boardState = document.getElementById('board-state');
+const addMoreBtn = document.getElementById('addMoreBtn');
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+const stickerLayer = document.getElementById('sticker-layer');
+
+let img = null;
+let lasso = [];
+let drawing = false;
+let stickerCount = 0;
+
+// Upload
+imgInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      setupCanvas();
+      uploadState.style.display = 'none';
+      editorEl.style.display = 'flex';
+      boardState.style.display = 'block';
+      addMoreBtn.style.display = 'flex';
+      imgInput.value = '';
+    };
+    image.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+function setupCanvas() {
+  const cardPad = 16; // account for the white canvas-card padding around the canvas
+  const maxW = Math.min(window.innerWidth - 24 - cardPad, 500);
+  const maxH = window.innerHeight - 180 - cardPad;
+  const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+  canvas.width = img.width * scale;
+  canvas.height = img.height * scale;
+  redrawCanvas();
+}
+
+function redrawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  if (lasso.length > 1) drawLasso();
+}
+
+function drawLasso() {
+  ctx.save();
+  ctx.strokeStyle = '#FF6F92';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 4]);
+  ctx.lineDashOffset = Date.now() / 40;
+  ctx.shadowColor = 'rgba(255,255,255,0.9)';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  lasso.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  if (!drawing) ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Animate lasso dash
+let lassoAnim = null;
+function startLassoAnim() {
+  if (lassoAnim) return;
+  lassoAnim = requestAnimationFrame(function loop() {
+    if (lasso.length > 1) { redrawCanvas(); lassoAnim = requestAnimationFrame(loop); }
+    else lassoAnim = null;
+  });
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+canvas.addEventListener('mousedown', e => { drawing = true; lasso = [getPos(e)]; });
+canvas.addEventListener('mousemove', e => { if (!drawing) return; lasso.push(getPos(e)); startLassoAnim(); });
+canvas.addEventListener('mouseup', () => { drawing = false; });
+
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; lasso = [getPos(e.touches[0])]; }, {passive:false});
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; lasso.push(getPos(e.touches[0])); startLassoAnim(); }, {passive:false});
+canvas.addEventListener('touchend', e => { e.preventDefault(); drawing = false; }, {passive:false});
+
+// Clear lasso
+document.getElementById('clearPathBtn').addEventListener('click', () => {
+  lasso = []; redrawCanvas();
+});
+
+// Back to board
+document.getElementById('backBtn').addEventListener('click', () => {
+  lasso = [];
+  editorEl.style.display = 'none';
+});
+
+document.getElementById('cancelBtn').addEventListener('click', () => {
+  lasso = [];
+  editorEl.style.display = 'none';
+});
+
+// Capture sticker
+document.getElementById('captureBtn').addEventListener('click', () => {
+  if (lasso.length < 3) return;
+
+  // Bounding box
+  const xs = lasso.map(p => p.x), ys = lasso.map(p => p.y);
+  const minX = Math.max(0, Math.floor(Math.min(...xs)) - 10);
+  const minY = Math.max(0, Math.floor(Math.min(...ys)) - 10);
+  const maxX = Math.min(canvas.width, Math.ceil(Math.max(...xs)) + 10);
+  const maxY = Math.min(canvas.height, Math.ceil(Math.max(...ys)) + 10);
+  const w = maxX - minX, h = maxY - minY;
+  if (w < 5 || h < 5) return;
+
+  // Offscreen canvas with clipping
+  const off = document.createElement('canvas');
+  const pad = 20;
+  off.width = w + pad * 2;
+  off.height = h + pad * 2;
+  const octx = off.getContext('2d');
+
+  const tracePath = () => {
+    octx.beginPath();
+    lasso.forEach((p, i) => {
+      const px = p.x - minX + pad;
+      const py = p.y - minY + pad;
+      i === 0 ? octx.moveTo(px, py) : octx.lineTo(px, py);
+    });
+    octx.closePath();
+  };
+
+  // Clip to lasso shape and draw the captured image
+  octx.save();
+  tracePath();
+  octx.clip();
+  octx.drawImage(canvas, -minX + pad, -minY + pad);
+  octx.restore();
+
+  // White outline, drawn unclipped so it's actually visible around the cutout
+  octx.save();
+  octx.strokeStyle = 'rgba(255,255,255,0.95)';
+  octx.lineWidth = 7;
+  octx.lineJoin = 'round';
+  tracePath();
+  octx.stroke();
+  octx.restore();
+
+  createSticker(off.toDataURL(), off.width, off.height);
+  lasso = [];
+  redrawCanvas();
+  editorEl.style.display = 'none';
+});
+
+function createSticker(dataUrl, w, h) {
+  stickerCount++;
+  const maxSide = Math.min(window.innerWidth * 0.45, 180);
+  const scale = Math.min(maxSide / w, maxSide / h, 1);
+  const sw = w * scale, sh = h * scale;
+
+  const el = document.createElement('div');
+  el.className = 'sticker';
+
+  const rot = (Math.random() - 0.5) * 24;
+  el.style.setProperty('--rot', rot + 'deg');
+
+  const x = Math.random() * Math.max(0, window.innerWidth - sw - 40) + 20;
+  const y = Math.random() * Math.max(0, window.innerHeight - sh - 120) + 40;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.width = sw + 'px';
+  el.style.height = sh + 'px';
+  el.style.transform = `rotate(${rot}deg)`;
+
+  const img2 = document.createElement('img');
+  img2.src = dataUrl;
+  img2.style.cssText = `width:100%;height:100%;display:block;pointer-events:none;`;
+  el.appendChild(img2);
+
+  // Drag
+  let drag = false, startX, startY, elX, elY, velX = 0, velY = 0, lastX, lastY, rafId;
+
+  function onStart(cx, cy) {
+    drag = true;
+    startX = cx; startY = cy;
+    elX = parseFloat(el.style.left); elY = parseFloat(el.style.top);
+    lastX = cx; lastY = cy;
+    velX = 0; velY = 0;
+    cancelAnimationFrame(rafId);
+    el.style.transition = 'none';
+    el.style.zIndex = 999;
+  }
+
+  function onMove(cx, cy) {
+    if (!drag) return;
+    velX = cx - lastX; velY = cy - lastY;
+    lastX = cx; lastY = cy;
+    elX += velX; elY += velY;
+    el.style.left = elX + 'px';
+    el.style.top = elY + 'px';
+  }
+
+  function onEnd() {
+    if (!drag) return;
+    drag = false;
+    float();
+  }
+
+  function float() {
+    let vx = velX * 0.6, vy = velY * 0.6;
+    let x2 = parseFloat(el.style.left), y2 = parseFloat(el.style.top);
+    const gravity = 0.15, damping = 0.97, bounce = -0.4;
+    const floor = window.innerHeight - sh - 10;
+    const ceil2 = 10, wallL = 10, wallR = window.innerWidth - sw - 10;
+
+    function step() {
+      vy += gravity;
+      vx *= damping; vy *= damping;
+      x2 += vx; y2 += vy;
+
+      if (y2 > floor) { y2 = floor; vy *= bounce; vx *= 0.85; }
+      if (y2 < ceil2) { y2 = ceil2; vy *= bounce; }
+      if (x2 < wallL) { x2 = wallL; vx *= bounce; }
+      if (x2 > wallR) { x2 = wallR; vx *= bounce; }
+
+      el.style.left = x2 + 'px';
+      el.style.top = y2 + 'px';
+
+      if (Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1 || y2 < floor) {
+        rafId = requestAnimationFrame(step);
+      }
+    }
+    rafId = requestAnimationFrame(step);
+  }
+
+  el.addEventListener('mousedown', e => { e.preventDefault(); onStart(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+  window.addEventListener('mouseup', () => onEnd());
+
+  el.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+  el.addEventListener('touchmove', e => { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+  el.addEventListener('touchend', e => { e.preventDefault(); onEnd(); }, {passive:false});
+
+  // Start floating after appear
+  setTimeout(float, 600);
+
+  stickerLayer.appendChild(el);
+}
+
+// Add more
+addMoreBtn.addEventListener('click', () => {
+  imgInput.click();
+});
+
+// Keep canvas sized correctly on rotation / resize
+window.addEventListener('resize', () => {
+  if (!img) return;
+  lasso = [];
+  setupCanvas();
+});
+</script>
+</body>
+</html>
