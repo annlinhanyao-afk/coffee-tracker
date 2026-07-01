@@ -149,6 +149,30 @@ body {
   margin-bottom: 14px;
 }
 
+.color-picker {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.color-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid rgba(74, 63, 61, 0.12);
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  transition: transform 0.15s, border-color 0.15s;
+}
+.color-dot:hover { transform: scale(1.12); }
+.color-dot.active {
+  border-color: var(--accent-dark);
+  transform: scale(1.18);
+  box-shadow: 0 2px 8px rgba(255, 111, 146, 0.4);
+}
+
 .actions {
   display: flex;
   gap: 10px;
@@ -260,7 +284,7 @@ input[type="file"] { display: none; }
 
 <!-- 上传界面 -->
 <div id="upload-state">
-  <div class="upload-circle" onclick="document.getElementById('imgInput').click()">📷</div>
+  <div class="upload-circle" onclick="activateGyro(); document.getElementById('imgInput').click()">📷</div>
   <div class="upload-title">生活碎片</div>
   <div class="upload-sub">上传图片，手绘圈选<br>捕捉每一个瞬间</div>
   <input type="file" id="imgInput" accept="image/*">
@@ -283,6 +307,14 @@ input[type="file"] { display: none; }
   </div>
   <div class="bottom-bar">
     <div class="hint-text">用手指圈出想要的部分</div>
+    <div class="color-picker" id="colorPicker">
+      <button class="color-dot active" data-color="#ffffff" style="background:#ffffff" aria-label="白色边框"></button>
+      <button class="color-dot" data-color="#FF8FA8" style="background:#FF8FA8" aria-label="粉色边框"></button>
+      <button class="color-dot" data-color="#BDEFDD" style="background:#BDEFDD" aria-label="薄荷绿边框"></button>
+      <button class="color-dot" data-color="#FFE08A" style="background:#FFE08A" aria-label="黄色边框"></button>
+      <button class="color-dot" data-color="#E4DBFB" style="background:#E4DBFB" aria-label="薰衣草边框"></button>
+      <button class="color-dot" data-color="#4A3F3D" style="background:#4A3F3D" aria-label="深色边框"></button>
+    </div>
     <div class="actions">
       <button class="action-btn secondary" id="cancelBtn">取消</button>
       <button class="action-btn primary" id="captureBtn">✨ 捕捉碎片</button>
@@ -313,6 +345,15 @@ let img = null;
 let lasso = [];
 let drawing = false;
 let stickerCount = 0;
+let borderColor = '#ffffff';
+
+document.querySelectorAll('.color-dot').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.color-dot').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    borderColor = btn.dataset.color;
+  });
+});
 
 // Upload
 imgInput.addEventListener('change', e => {
@@ -354,20 +395,37 @@ function redrawCanvas() {
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 }
 
-// Builds a rounded path through the lasso points (quadratic curve through
-// each midpoint) instead of a jagged polyline, so both the live preview and
-// the final die-cut border look like a clean sticker outline.
+// Chaikin corner-cutting: repeatedly replaces each edge with two points 3/4
+// and 1/4 along it, which rounds off every corner of the hand-drawn path
+// automatically without the user needing to trace carefully.
+function chaikinSmooth(points, iterations, closed) {
+  let pts = points;
+  for (let it = 0; it < iterations; it++) {
+    const n = pts.length;
+    if (n < 3) break;
+    const out = [];
+    if (!closed) out.push(pts[0]);
+    const segments = closed ? n : n - 1;
+    for (let i = 0; i < segments; i++) {
+      const p0 = pts[i];
+      const p1 = pts[(i + 1) % n];
+      out.push({ x: p0.x * 0.75 + p1.x * 0.25, y: p0.y * 0.75 + p1.y * 0.25 });
+      out.push({ x: p0.x * 0.25 + p1.x * 0.75, y: p0.y * 0.25 + p1.y * 0.75 });
+    }
+    if (!closed) out.push(pts[n - 1]);
+    pts = out;
+  }
+  return pts;
+}
+
+// Builds a smoothed, rounded path through the lasso points so both the live
+// preview and the final die-cut border look like a clean sticker outline
+// rather than the user's exact jagged finger trace.
 function tracePath(context, points, mapPoint, closed) {
   if (points.length < 2) return;
-  const p0 = mapPoint(points[0]);
-  context.moveTo(p0.x, p0.y);
-  for (let i = 1; i < points.length - 1; i++) {
-    const cur = mapPoint(points[i]);
-    const next = mapPoint(points[i + 1]);
-    context.quadraticCurveTo(cur.x, cur.y, (cur.x + next.x) / 2, (cur.y + next.y) / 2);
-  }
-  const last = mapPoint(points[points.length - 1]);
-  context.lineTo(last.x, last.y);
+  const smoothed = chaikinSmooth(points, 2, closed).map(mapPoint);
+  context.moveTo(smoothed[0].x, smoothed[0].y);
+  for (let i = 1; i < smoothed.length; i++) context.lineTo(smoothed[i].x, smoothed[i].y);
   if (closed) context.closePath();
 }
 
@@ -499,10 +557,10 @@ document.getElementById('captureBtn').addEventListener('click', () => {
   octx.drawImage(canvas, -minX + pad, -minY + pad);
   octx.restore();
 
-  // Solid white die-cut outline, drawn unclipped so it's fully visible
-  // around the cutout like a printed sticker border.
+  // Solid die-cut outline in the user's chosen color, drawn unclipped so
+  // it's fully visible around the cutout like a printed sticker border.
   octx.save();
-  octx.strokeStyle = '#ffffff';
+  octx.strokeStyle = borderColor;
   octx.lineWidth = 10;
   octx.lineJoin = 'round';
   octx.lineCap = 'round';
@@ -516,6 +574,78 @@ document.getElementById('captureBtn').addEventListener('click', () => {
   clearLassoPreview();
   editorEl.style.display = 'none';
 });
+
+// --- Gyroscope-driven gravity -------------------------------------------
+// gravityX/gravityY point in the direction "down" currently is, based on
+// how the phone is tilted. Defaults to straight down for desktop or when
+// no sensor/permission is available, matching the old fixed-gravity feel.
+let gravityX = 0;
+let gravityY = 1;
+let gyroActive = false;
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function onDeviceOrientation(e) {
+  if (e.beta == null || e.gamma == null) return;
+  const gamma = clamp(e.gamma, -45, 45);      // left/right tilt
+  const relBeta = clamp(e.beta - 90, -45, 45); // front/back tilt from upright
+  gravityX = gamma / 45;
+  gravityY = relBeta / 45;
+}
+
+function activateGyro() {
+  if (gyroActive) return;
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS: must be called from a user gesture handler to show the prompt.
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') {
+        gyroActive = true;
+        window.addEventListener('deviceorientation', onDeviceOrientation);
+      }
+    }).catch(() => {});
+  } else if (typeof DeviceOrientationEvent !== 'undefined') {
+    gyroActive = true;
+    window.addEventListener('deviceorientation', onDeviceOrientation);
+  }
+}
+activateGyro();
+
+// --- Ambient sticker physics ---------------------------------------------
+// A single shared loop drives every resting sticker with the current
+// gravity vector, so tilting the phone makes the whole board of stickers
+// slide/settle together like marbles in a tray.
+const GRAVITY = 0.15, DAMPING = 0.97, BOUNCE = -0.4;
+const stickers = [];
+let physicsRaf = null;
+
+function ensurePhysicsLoop() {
+  if (physicsRaf) return;
+  const tick = () => {
+    for (const s of stickers) {
+      if (s.dragging || s.frozen) continue;
+
+      s.vx += gravityX * GRAVITY;
+      s.vy += gravityY * GRAVITY;
+      s.vx *= DAMPING;
+      s.vy *= DAMPING;
+      s.x += s.vx;
+      s.y += s.vy;
+
+      const floor = window.innerHeight - s.h - 10;
+      const ceil = 10, wallL = 10, wallR = window.innerWidth - s.w - 10;
+
+      if (s.y > floor) { s.y = floor; s.vy *= BOUNCE; s.vx *= 0.85; if (Math.abs(s.vy) < 0.05) s.vy = 0; }
+      if (s.y < ceil) { s.y = ceil; s.vy *= BOUNCE; if (Math.abs(s.vy) < 0.05) s.vy = 0; }
+      if (s.x < wallL) { s.x = wallL; s.vx *= BOUNCE; if (Math.abs(s.vx) < 0.05) s.vx = 0; }
+      if (s.x > wallR) { s.x = wallR; s.vx *= BOUNCE; if (Math.abs(s.vx) < 0.05) s.vx = 0; }
+
+      s.el.style.left = s.x + 'px';
+      s.el.style.top = s.y + 'px';
+    }
+    physicsRaf = requestAnimationFrame(tick);
+  };
+  physicsRaf = requestAnimationFrame(tick);
+}
 
 function createSticker(dataUrl, w, h) {
   stickerCount++;
@@ -542,60 +672,33 @@ function createSticker(dataUrl, w, h) {
   img2.style.cssText = `width:100%;height:100%;display:block;pointer-events:none;`;
   el.appendChild(img2);
 
-  // Drag
-  let drag = false, startX, startY, elX, elY, velX = 0, velY = 0, lastX, lastY, rafId;
+  const state = { el, x, y, vx: 0, vy: 0, w: sw, h: sh, dragging: false, frozen: true };
+  stickers.push(state);
+
+  let lastX, lastY;
 
   function onStart(cx, cy) {
-    drag = true;
-    startX = cx; startY = cy;
-    elX = parseFloat(el.style.left); elY = parseFloat(el.style.top);
+    state.dragging = true;
+    state.frozen = false;
     lastX = cx; lastY = cy;
-    velX = 0; velY = 0;
-    cancelAnimationFrame(rafId);
-    el.style.transition = 'none';
+    state.vx = 0; state.vy = 0;
     el.style.zIndex = 999;
   }
 
   function onMove(cx, cy) {
-    if (!drag) return;
-    velX = cx - lastX; velY = cy - lastY;
+    if (!state.dragging) return;
+    const dx = cx - lastX, dy = cy - lastY;
     lastX = cx; lastY = cy;
-    elX += velX; elY += velY;
-    el.style.left = elX + 'px';
-    el.style.top = elY + 'px';
+    state.x += dx; state.y += dy;
+    state.vx = dx; state.vy = dy;
+    el.style.left = state.x + 'px';
+    el.style.top = state.y + 'px';
   }
 
   function onEnd() {
-    if (!drag) return;
-    drag = false;
-    float();
-  }
-
-  function float() {
-    let vx = velX * 0.6, vy = velY * 0.6;
-    let x2 = parseFloat(el.style.left), y2 = parseFloat(el.style.top);
-    const gravity = 0.15, damping = 0.97, bounce = -0.4;
-    const floor = window.innerHeight - sh - 10;
-    const ceil2 = 10, wallL = 10, wallR = window.innerWidth - sw - 10;
-
-    function step() {
-      vy += gravity;
-      vx *= damping; vy *= damping;
-      x2 += vx; y2 += vy;
-
-      if (y2 > floor) { y2 = floor; vy *= bounce; vx *= 0.85; }
-      if (y2 < ceil2) { y2 = ceil2; vy *= bounce; }
-      if (x2 < wallL) { x2 = wallL; vx *= bounce; }
-      if (x2 > wallR) { x2 = wallR; vx *= bounce; }
-
-      el.style.left = x2 + 'px';
-      el.style.top = y2 + 'px';
-
-      if (Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1 || y2 < floor) {
-        rafId = requestAnimationFrame(step);
-      }
-    }
-    rafId = requestAnimationFrame(step);
+    if (!state.dragging) return;
+    state.dragging = false;
+    state.vx *= 0.6; state.vy *= 0.6;
   }
 
   el.addEventListener('mousedown', e => { e.preventDefault(); onStart(e.clientX, e.clientY); });
@@ -606,14 +709,16 @@ function createSticker(dataUrl, w, h) {
   el.addEventListener('touchmove', e => { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
   el.addEventListener('touchend', e => { e.preventDefault(); onEnd(); }, {passive:false});
 
-  // Start floating after appear
-  setTimeout(float, 600);
+  // Let the pop-in animation play before gravity takes over
+  setTimeout(() => { state.frozen = false; }, 600);
 
   stickerLayer.appendChild(el);
+  ensurePhysicsLoop();
 }
 
 // Add more
 addMoreBtn.addEventListener('click', () => {
+  activateGyro();
   imgInput.click();
 });
 
