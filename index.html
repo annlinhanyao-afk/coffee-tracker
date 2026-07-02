@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#FFF7F1">
 <title>生活碎片</title>
 <style>
@@ -19,6 +19,15 @@
   --text: #4A3F3D;
   --text-soft: rgba(74, 63, 61, 0.55);
   --shadow-warm: rgba(255, 143, 168, 0.28);
+}
+
+html, body {
+  /* Prevent double-tap-to-zoom, pinch-zoom and overscroll bounce, all of
+     which shift the visual viewport and throw off every canvas tap
+     position afterwards - easy to trigger by accident while tapping
+     several points in quick succession. */
+  touch-action: manipulation;
+  overscroll-behavior: none;
 }
 
 body {
